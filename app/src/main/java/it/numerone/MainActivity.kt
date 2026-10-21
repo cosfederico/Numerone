@@ -6,15 +6,24 @@ import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.animation.Crossfade
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.isImeVisible
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ShowChart
+import androidx.compose.material.icons.outlined.Timer
+import androidx.compose.material3.Icon
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.ui.Alignment
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -41,7 +50,6 @@ import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.TextUnit
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.json.JSONArray
 import org.json.JSONObject
@@ -114,26 +122,37 @@ fun NumeroneTheme(content: @Composable () -> Unit) {
             bodyMedium = t.bodyMedium.copy(fontFamily = Sans),
             labelLarge = t.labelLarge.copy(fontFamily = Sans, fontWeight = FontWeight.Bold),
             titleMedium = t.titleMedium.copy(fontFamily = Sans),
+            labelMedium = t.labelMedium.copy(fontFamily = Sans, fontWeight = FontWeight.Medium),
         ),
         content = content,
     )
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun App(store: RunStore) {
     var runs by remember { mutableStateOf(store.load()) }
     var tab by rememberSaveable { mutableIntStateOf(0) }
     val tabs = rememberSaveableStateHolder()
     Surface(Modifier.fillMaxSize(), color = Beige, contentColor = Ink) {
-        Column(Modifier.safeDrawingPadding()) {
-            Row(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 16.dp), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-                listOf("Pratica", "Risultati").forEachIndexed { i, label ->
-                    Text(label, Modifier.clickable { tab = i }, color = if (i == tab) Ink else Muted, fontFamily = Serif, fontSize = 26.sp)
+        Column(Modifier.statusBarsPadding().imePadding()) {
+            Crossfade(tab, Modifier.weight(1f), label = "tab") { t ->
+                tabs.SaveableStateProvider(t) {
+                    if (t == 0) PracticeScreen(runs) { runs = runs + it; store.save(runs) }
+                    else ResultsScreen(runs)
                 }
             }
-            tabs.SaveableStateProvider(tab) {
-                if (tab == 0) PracticeScreen(runs) { runs = runs + it; store.save(runs) }
-                else ResultsScreen(runs)
+            // Hidden while typing so the keyboard sits right under the answer.
+            if (!WindowInsets.isImeVisible) NavigationBar(containerColor = Beige) {
+                listOf("Pratica" to Icons.Outlined.Timer, "Risultati" to Icons.AutoMirrored.Outlined.ShowChart).forEachIndexed { i, (label, icon) ->
+                    NavigationBarItem(
+                        i == tab, { tab = i }, { Icon(icon, null) }, label = { Text(label) },
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = Ink, selectedTextColor = Ink, indicatorColor = Sand,
+                            unselectedIconColor = Muted, unselectedTextColor = Muted,
+                        ),
+                    )
+                }
             }
         }
     }
@@ -141,8 +160,11 @@ fun App(store: RunStore) {
 
 /** Digits on a single line, sized to fill the width (capped at [maxSize]), each colored by [color]. */
 @Composable
-fun Digits(text: String, modifier: Modifier = Modifier, maxSize: TextUnit = 40.sp, color: (Int) -> Color = { Ink }) {
-    BoxWithConstraints(modifier.fillMaxWidth()) {
+fun Digits(
+    text: String, modifier: Modifier = Modifier, maxSize: TextUnit = 40.sp, align: Alignment = Alignment.TopStart,
+    color: (Int) -> Color = { Ink },
+) {
+    BoxWithConstraints(modifier.fillMaxWidth(), contentAlignment = align) {
         val fit = with(LocalDensity.current) { (maxWidth / (LENGTH * 0.68f)).toSp() }
         Text(
             buildAnnotatedString { text.forEachIndexed { i, c -> withStyle(SpanStyle(color = color(i))) { append(c) } } },

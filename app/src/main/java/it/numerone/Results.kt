@@ -1,6 +1,8 @@
 package it.numerone
 
+import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -60,6 +62,7 @@ private fun Long.pickerDate(): LocalDate = Instant.ofEpochMilli(this).atZone(Zon
 @Composable
 fun ResultsScreen(runs: List<Run>) {
     var period by rememberSaveable { mutableIntStateOf(1) }
+    var metric by rememberSaveable { mutableIntStateOf(0) } // 0 time, 1 wrong digits
     var from by rememberSaveable { mutableStateOf<Long?>(null) }
     var to by rememberSaveable { mutableStateOf<Long?>(null) }
     var timeMode by rememberSaveable { mutableIntStateOf(0) } // 0 any, 1 under, 2 over
@@ -81,9 +84,17 @@ fun ResultsScreen(runs: List<Run>) {
 
     LazyColumn(contentPadding = PaddingValues(24.dp, 0.dp, 24.dp, 24.dp)) {
         item {
+            Text("Risultati", Modifier.padding(top = 24.dp, bottom = 16.dp), fontFamily = Serif, fontSize = 40.sp)
             Chips(periods.map { it.first }, period) { period = it }
-            Chart("Tempo di memorizzazione", charted, chartStart, now, { it.millis.toFloat() }) { formatTime(it.toLong()) }
-            Chart("Cifre errate", charted, chartStart, now, { it.errors.toFloat() }) { it.toInt().toString() }
+            Row(Modifier.padding(top = 20.dp, bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+                listOf("Tempo", "Errori").forEachIndexed { i, label ->
+                    Text(label, Modifier.clickable { metric = i }, color = if (i == metric) Ink else Muted, fontFamily = Serif, fontSize = 22.sp)
+                }
+            }
+            Crossfade(metric, label = "metric") {
+                if (it == 0) Chart(charted, chartStart, now, { r -> r.millis.toFloat() }) { v -> formatTime(v.toLong()) }
+                else Chart(charted, chartStart, now, { r -> r.errors.toFloat() }) { v -> v.toInt().toString() }
+            }
             Spacer(Modifier.height(24.dp))
             HorizontalDivider(color = Sand)
             Spacer(Modifier.height(16.dp))
@@ -159,17 +170,14 @@ private fun Chip(label: String, selected: Boolean, onClick: () -> Unit) = Filter
 
 /** Values plotted against date between [start] and [end]; dots green for correct runs, red for wrong. */
 @Composable
-private fun Chart(title: String, runs: List<Run>, start: Long, end: Long, value: (Run) -> Float, format: (Float) -> String) {
+private fun Chart(runs: List<Run>, start: Long, end: Long, value: (Run) -> Float, format: (Float) -> String) = Column {
     val max = runs.maxOfOrNull(value)?.coerceAtLeast(1f) ?: 1f
-    Row(Modifier.fillMaxWidth().padding(top = 20.dp, bottom = 8.dp)) {
-        Text(title, Modifier.weight(1f), fontFamily = Serif, fontSize = 20.sp)
-        if (runs.isNotEmpty()) Text("max ${format(max)}", color = Muted, fontSize = 13.sp)
-    }
     if (runs.isEmpty()) {
         Text("Nessun dato nel periodo", color = Muted, fontSize = 13.sp)
-        return
+        return@Column
     }
-    Canvas(Modifier.fillMaxWidth().height(120.dp)) {
+    Text("max ${format(max)}", Modifier.align(Alignment.End), color = Muted, fontSize = 13.sp)
+    Canvas(Modifier.fillMaxWidth().height(140.dp)) {
         val r = 4.dp.toPx()
         fun point(run: Run) = Offset(
             if (end > start) r + (size.width - 2 * r) * (run.time - start) / (end - start) else size.width / 2,

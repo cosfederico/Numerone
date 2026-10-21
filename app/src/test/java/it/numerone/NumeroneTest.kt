@@ -30,7 +30,7 @@ class NumeroneTest {
 
     @Test
     fun formatsTime() {
-        assertEquals("1:02.3", formatTime(62_345))
+        assertEquals("01:02.34", formatTime(62_345))
         assertEquals("−1.5s", formatDelta(-1_500))
     }
 }
