@@ -10,6 +10,14 @@ data class Run(val time: Long, val millis: Long, val number: String, val input: 
     val correct get() = errors == 0
 }
 
+data class Reached(val target: Long, val time: Long, val millis: Long)
+
+data class Goals(val target: Long? = null, val reached: List<Reached> = emptyList()) {
+    /** Crowns the target when [run] is correct and strictly faster; the target is then cleared. */
+    fun after(run: Run) =
+        if (target != null && run.correct && run.millis < target) Goals(null, reached + Reached(target, run.time, run.millis)) else this
+}
+
 /** 20 random digits whose 10 pairs (positions 0-1, 2-3, ...) are all distinct. */
 fun generateNumerone(random: Random = Random.Default): String {
     while (true) {

@@ -8,6 +8,7 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -16,15 +17,19 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -34,6 +39,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.AlertDialog
@@ -56,33 +62,39 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlin.math.sin
 import kotlin.random.Random
+import kotlinx.coroutines.delay
 
 private enum class Phase { Idle, Ready, Memorizing, Recall, Done }
 
 private const val DIGIT_REVEAL_MS = 40
 
 @Composable
-fun PracticeScreen(runs: List<Run>, onRun: (Run) -> Unit) {
+fun PracticeScreen(runs: List<Run>, reached: List<Reached>, onRun: (Run) -> Unit, onGoal: () -> Unit) {
     var phase by rememberSaveable { mutableStateOf(Phase.Idle) }
     var number by rememberSaveable { mutableStateOf("") }
     var input by rememberSaveable { mutableStateOf("") }
@@ -168,7 +180,11 @@ fun PracticeScreen(runs: List<Run>, onRun: (Run) -> Unit) {
             }
         }
 
-        if (checked && record) Confetti()
+        val goal = reached.firstOrNull { it.time == time }
+        if (checked && goal != null) GoalCelebration(goal.target) {
+            phase = Phase.Idle
+            onGoal()
+        } else if (checked && record) Confetti(listOf(Good, Bad, Ink, Gold, Sand))
     }
 
     if (confirm) AlertDialog(
@@ -308,18 +324,79 @@ private fun DigitInput(value: String, onChange: (String) -> Unit) {
 private class Piece(val x: Float, val vx: Float, val vy: Float, val spin: Float, val color: Color)
 
 @Composable
-private fun Confetti() {
+private fun Confetti(colors: List<Color>, count: Int = 120) {
     val t = remember { Animatable(0f) }
     LaunchedEffect(Unit) { t.animateTo(1f, tween(3500, easing = LinearEasing)) }
-    val colors = listOf(Good, Bad, Ink, Color(0xFFC9A646), Sand)
     val pieces = remember {
-        List(120) { Piece(Random.nextFloat(), Random.nextFloat() * 160 - 80, Random.nextFloat() * 300 + 60, Random.nextFloat() * 720 - 360, colors.random()) }
+        List(count) { Piece(Random.nextFloat(), Random.nextFloat() * 160 - 80, Random.nextFloat() * 300 + 60, Random.nextFloat() * 720 - 360, colors.random()) }
     }
     if (t.value < 1f) Canvas(Modifier.fillMaxSize()) {
         val s = t.value * 3.5f
         pieces.forEach { p ->
             val pos = Offset(size.width * p.x + p.vx * s * density, (p.vy * s + 140 * s * s - 20) * density)
             rotate(p.spin * s, pos) { drawRect(p.color, pos - Offset(6 * density, 3 * density), Size(12 * density, 6 * density)) }
+        }
+    }
+}
+
+/** The biggest celebration: golden overlay, gold confetti and rising claps. Tap or wait to continue. */
+@Composable
+private fun GoalCelebration(target: Long, onDone: () -> Unit) {
+    val appear = remember { Animatable(0f) }
+    LaunchedEffect(Unit) { appear.animateTo(1f, spring(dampingRatio = 0.45f, stiffness = 120f)) }
+    LaunchedEffect(Unit) {
+        delay(6500)
+        onDone()
+    }
+    val brush = goldBrush()
+    Box(
+        Modifier.fillMaxSize()
+            .background(Beige.copy(alpha = 0.97f))
+            .background(Brush.radialGradient(listOf(GoldLight.copy(alpha = 0.6f), Color.Transparent)))
+            .clickable(remember { MutableInteractionSource() }, null, onClick = onDone),
+        contentAlignment = Alignment.Center,
+    ) {
+        Claps()
+        Column(
+            Modifier.padding(24.dp).graphicsLayer {
+                scaleX = 0.5f + 0.5f * appear.value
+                scaleY = scaleX
+                alpha = appear.value.coerceIn(0f, 1f)
+            },
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Icon(Icons.Filled.EmojiEvents, null, Modifier.size(88.dp).gold(brush))
+            Text(
+                "HAI RAGGIUNTO\nIL TUO OBIETTIVO!", style = TextStyle(brush = brush),
+                fontFamily = Serif, fontSize = 40.sp, lineHeight = 46.sp, textAlign = TextAlign.Center,
+            )
+            Text(formatTime(target), style = TextStyle(brush = brush), fontFamily = Serif, fontSize = 34.sp)
+            Text("Fatti un bel punto 7", Modifier.padding(top = 8.dp), color = Ink, fontSize = 20.sp)
+        }
+        Confetti(listOf(Gold, GoldLight, GoldDark, Color(0xFFFFF4C9)), count = 240)
+    }
+}
+
+private class Clap(val x: Float, val delay: Float, val size: Int, val phase: Float)
+
+@Composable
+private fun Claps() {
+    val t = remember { Animatable(0f) }
+    LaunchedEffect(Unit) { t.animateTo(1f, tween(6500, easing = LinearEasing)) }
+    val claps = remember { List(28) { Clap(Random.nextFloat() * 0.85f, Random.nextFloat() * 0.65f, 28 + Random.nextInt(32), Random.nextFloat() * 6.3f) } }
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val w = constraints.maxWidth
+        val h = constraints.maxHeight
+        claps.forEach { c ->
+            val p = (t.value - c.delay) / 0.35f // each clap rises over 35% of the show
+            if (p in 0f..1f) Text(
+                "👏",
+                Modifier
+                    .offset { IntOffset((c.x * w + sin(p * 7 + c.phase) * 24.dp.toPx()).toInt(), (h * (1.05f - 1.2f * p)).toInt()) }
+                    .graphicsLayer { alpha = 1 - p * p; rotationZ = sin(p * 12 + c.phase) * 15 },
+                fontSize = c.size.sp,
+            )
         }
     }
 }

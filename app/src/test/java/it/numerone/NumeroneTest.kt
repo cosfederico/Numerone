@@ -29,6 +29,16 @@ class NumeroneTest {
     }
 
     @Test
+    fun goalIsReachedOnlyByCorrectFasterRun() {
+        val n = "12345678901234567890"
+        val goals = Goals(target = 20_000)
+        assertEquals(goals, goals.after(Run(1, 19_000, n, ""))) // wrong digits
+        assertEquals(goals, goals.after(Run(1, 20_000, n, n))) // not below target
+        assertEquals(Goals(null, listOf(Reached(20_000, 1, 19_000))), goals.after(Run(1, 19_000, n, n)))
+        assertEquals(Goals(), Goals().after(Run(1, 1, n, n))) // no target set
+    }
+
+    @Test
     fun formatsTime() {
         assertEquals("01:02.34", formatTime(62_345))
         assertEquals("−1.5s", formatDelta(-1_500))
