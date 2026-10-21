@@ -67,7 +67,10 @@ import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -76,7 +79,7 @@ import kotlin.random.Random
 
 private enum class Phase { Idle, Ready, Memorizing, Recall, Done }
 
-private const val DIGIT_REVEAL_MS = 90
+private const val DIGIT_REVEAL_MS = 40
 
 @Composable
 fun PracticeScreen(runs: List<Run>, onRun: (Run) -> Unit) {
@@ -250,9 +253,9 @@ private fun Check(run: Run, reveal: Float, checked: Boolean, record: Boolean, pr
                 )
                 Spacer(Modifier.height(16.dp))
                 HorizontalDivider(color = Sand)
-                Stat("Ultimo tentativo", previous?.let { "${formatTime(it.millis)} · ${it.errors} err." }, previous?.let { run.millis - it.millis })
+                Stat("Ultimo tentativo", previous?.millis, previous?.let { " · ${it.errors} err." }, previous?.let { run.millis - it.millis })
                 HorizontalDivider(color = Sand)
-                Stat("Record", best?.let { formatTime(it) }, best?.let { run.millis - it })
+                Stat("Record", best, null, best?.let { run.millis - it })
                 HorizontalDivider(color = Sand)
             }
         }
@@ -260,11 +263,17 @@ private fun Check(run: Run, reveal: Float, checked: Boolean, record: Boolean, pr
 }
 
 @Composable
-private fun Stat(label: String, value: String?, delta: Long?) {
+private fun Stat(label: String, millis: Long?, extra: String?, delta: Long?) {
     Row(Modifier.fillMaxWidth().padding(vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
             Label(label)
-            Text(value ?: "—", fontFamily = Serif, fontSize = 24.sp)
+            Text(
+                buildAnnotatedString {
+                    withStyle(SpanStyle(fontFamily = Serif, fontSize = 24.sp)) { append(millis?.let(::formatTime) ?: "—") }
+                    extra?.let(::append)
+                },
+                fontSize = 16.sp,
+            )
         }
         if (delta != null) Text(formatDelta(delta), color = if (delta < 0) Good else Bad, fontWeight = FontWeight.Bold)
     }

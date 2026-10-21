@@ -114,7 +114,7 @@ fun NumeroneTheme(content: @Composable () -> Unit) {
             primary = Ink, onPrimary = Beige, primaryContainer = Sand, onPrimaryContainer = Ink,
             secondaryContainer = Sand, onSecondaryContainer = Ink,
             background = Beige, onBackground = Ink, surface = Beige, onSurface = Ink, onSurfaceVariant = Muted,
-            surfaceContainerHigh = Color(0xFFF3EEE5), surfaceContainerHighest = Color(0xFFF3EEE5),
+            surfaceContainer = Color(0xFFF3EEE5), surfaceContainerHigh = Color(0xFFF3EEE5), surfaceContainerHighest = Color(0xFFF3EEE5),
             outline = Muted, outlineVariant = Sand,
         ),
         typography = Typography(
