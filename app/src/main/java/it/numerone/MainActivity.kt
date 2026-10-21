@@ -6,7 +6,22 @@ import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.Crossfade
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material3.IconButton
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.unit.dp
+import java.util.Locale
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -76,6 +91,10 @@ val Ink = Color(0xFF2A2623)
 val Muted = Color(0xFF8C8377)
 val Good = Color(0xFF4C8A5A)
 val Bad = Color(0xFFC0503F)
+
+/** Space above the big page titles; the settings gear lines up with it. */
+val TITLE_TOP = 12.dp
+
 val Gold = Color(0xFFC9A646)
 val GoldLight = Color(0xFFF1DE8F)
 val GoldDark = Color(0xFF9A7621)
@@ -92,6 +111,7 @@ val Sans = FontFamily(
 class Store(dir: File) {
     private val runsFile = AtomicFile(File(dir, "runs.json"))
     private val goalsFile = AtomicFile(File(dir, "goals.json"))
+    private val settingsFile = AtomicFile(File(dir, "settings.json"))
 
     fun loadRuns(): List<Run> = runsFile.read()?.let { JSONArray(it) }?.objects()?.map {
         Run(it.getLong("time"), it.getLong("millis"), it.getString("number"), it.getString("input"))
@@ -113,6 +133,13 @@ class Store(dir: File) {
             JSONObject().put("target", it.target).put("time", it.time).put("millis", it.millis)
         })).toString()
     )
+
+    /** The stored name is re-validated on load, so a tampered file can't smuggle anything else in. */
+    fun loadSettings(defaultLang: String): Settings = settingsFile.read()?.let { JSONObject(it) }?.let { o ->
+        Settings(validName(o.optString("name")) ?: "", o.optString("lang").takeIf { it in setOf("it", "en") } ?: defaultLang)
+    } ?: Settings(lang = defaultLang)
+
+    fun saveSettings(settings: Settings) = settingsFile.write(JSONObject().put("name", settings.name).put("lang", settings.lang).toString())
 
     private fun JSONArray.objects() = List(length()) { getJSONObject(it) }
 
@@ -170,45 +197,75 @@ fun NumeroneTheme(content: @Composable () -> Unit) {
 fun App(store: Store) {
     var runs by remember { mutableStateOf(store.loadRuns()) }
     var goals by remember { mutableStateOf(store.loadGoals()) }
+    var settings by remember { mutableStateOf(store.loadSettings(if (Locale.getDefault().language == "en") "en" else "it")) }
     fun updateGoals(g: Goals) {
         goals = g
         store.saveGoals(g)
     }
+    fun updateSettings(s: Settings) {
+        settings = s
+        store.saveSettings(s)
+    }
     var tab by rememberSaveable { mutableIntStateOf(1) }
+    var settingsOpen by rememberSaveable { mutableStateOf(false) }
     val tabs = rememberSaveableStateHolder()
-    Surface(Modifier.fillMaxSize(), color = Beige, contentColor = Ink) {
-        Column(Modifier.statusBarsPadding().imePadding()) {
-            Crossfade(tab, Modifier.weight(1f), label = "tab") { t ->
-                tabs.SaveableStateProvider(t) {
-                    when (t) {
-                        0 -> GoalScreen(runs, goals) { updateGoals(goals.copy(target = it)) }
-                        1 -> PracticeScreen(
-                            runs, goals.reached,
-                            onRun = {
-                                runs = runs + it
-                                store.saveRuns(runs)
-                                goals.after(it).let { g -> if (g != goals) updateGoals(g) }
-                            },
-                            onGoal = { tab = 0 },
-                        )
-                        else -> ResultsScreen(runs, goals.target)
+    CompositionLocalProvider(LocalStrings provides if (settings.lang == "en") En else It) {
+        Surface(Modifier.fillMaxSize(), color = Beige, contentColor = Ink) {
+            if (settings.name.isEmpty()) Box(Modifier.statusBarsPadding().imePadding()) {
+                WelcomeScreen(settings, { updateSettings(settings.copy(lang = it)) }) { updateSettings(settings.copy(name = it)) }
+            } else Box {
+                Column(Modifier.statusBarsPadding().imePadding()) {
+                    Box(Modifier.weight(1f)) {
+                    Crossfade(tab, label = "tab") { t ->
+                        tabs.SaveableStateProvider(t) {
+                            when (t) {
+                                0 -> GoalScreen(runs, goals, settings.name) { updateGoals(goals.copy(target = it)) }
+                                1 -> PracticeScreen(
+                                    runs, goals.reached, settings.name,
+                                    onRun = {
+                                        runs = runs + it
+                                        store.saveRuns(runs)
+                                        goals.after(it).let { g -> if (g != goals) updateGoals(g) }
+                                    },
+                                    onGoal = { tab = 0 },
+                                )
+                                else -> ResultsScreen(runs, goals.target)
+                            }
+                        }
+                    }
+                    // Floats on the page's first line: the motto on Pratica, the big title elsewhere.
+                    val gearTop by animateDpAsState(if (tab == 1) 0.dp else TITLE_TOP + 4.dp, label = "gear")
+                    IconButton({ settingsOpen = true }, Modifier.align(Alignment.TopEnd).padding(top = gearTop, end = 8.dp)) {
+                        Icon(Icons.Outlined.Settings, S.settings, tint = Muted)
+                    }
+                    }
+                    // Hidden while typing so the keyboard sits right under the answer.
+                    if (!WindowInsets.isImeVisible) NavigationBar(containerColor = Beige) {
+                        listOf(Icons.Outlined.Flag, Icons.Outlined.Timer, Icons.AutoMirrored.Outlined.ShowChart).forEachIndexed { i, icon ->
+                            NavigationBarItem(
+                                i == tab, { tab = i }, { Icon(icon, null) }, label = { Text(S.tabs[i]) },
+                                colors = NavigationBarItemDefaults.colors(
+                                    selectedIconColor = Ink, selectedTextColor = Ink, indicatorColor = Sand,
+                                    unselectedIconColor = Muted, unselectedTextColor = Muted,
+                                ),
+                            )
+                        }
                     }
                 }
-            }
-            // Hidden while typing so the keyboard sits right under the answer.
-            if (!WindowInsets.isImeVisible) NavigationBar(containerColor = Beige) {
-                listOf(
-                    "Obiettivo" to Icons.Outlined.Flag,
-                    "Pratica" to Icons.Outlined.Timer,
-                    "Risultati" to Icons.AutoMirrored.Outlined.ShowChart,
-                ).forEachIndexed { i, (label, icon) ->
-                    NavigationBarItem(
-                        i == tab, { tab = i }, { Icon(icon, null) }, label = { Text(label) },
-                        colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = Ink, selectedTextColor = Ink, indicatorColor = Sand,
-                            unselectedIconColor = Muted, unselectedTextColor = Muted,
-                        ),
-                    )
+                // Drawn over the tabs (not instead of them) so a running exercise keeps its state.
+                AnimatedVisibility(settingsOpen, enter = slideInVertically { it / 8 } + fadeIn(), exit = slideOutVertically { it / 8 } + fadeOut()) {
+                    Surface(Modifier.fillMaxSize(), color = Beige) {
+                        Box(Modifier.statusBarsPadding().imePadding()) {
+                            SettingsScreen(
+                                settings, ::updateSettings,
+                                onDeleteAll = {
+                                    runs = emptyList()
+                                    store.saveRuns(runs)
+                                },
+                                onClose = { settingsOpen = false },
+                            )
+                        }
+                    }
                 }
             }
         }

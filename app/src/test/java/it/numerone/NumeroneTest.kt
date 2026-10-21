@@ -39,6 +39,18 @@ class NumeroneTest {
     }
 
     @Test
+    fun namesAreSanitized() {
+        assertEquals("Nicolò", validName("  Nicolò  "))
+        assertEquals("D'Angelo-Rossi", validName("D'Angelo-Rossi"))
+        assertEquals("scriptalertscript", validName("<script>alert(1)</script>"))
+        assertEquals("Robert DROP TABLE--", validName("Robert\"); DROP TABLE;--"))
+        assertEquals(null, validName("123 !!"))
+        assertEquals(null, validName("  -- "))
+        assertEquals(MAX_NAME, cleanName("a".repeat(100)).length)
+        assertEquals("Ann ", cleanName("Ann\u0000\u202E  "))
+    }
+
+    @Test
     fun formatsTime() {
         assertEquals("01:02.34", formatTime(62_345))
         assertEquals("−1.5s", formatDelta(-1_500))

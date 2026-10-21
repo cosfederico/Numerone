@@ -74,11 +74,9 @@ import java.time.temporal.TemporalAdjusters
 import java.time.temporal.ChronoUnit
 import java.util.Locale
 
-// Calendar days back from today (inclusive); null = all data.
-private val periods = listOf("Oggi" to 1, "3 giorni" to 3, "Settimana" to 7, "Mese" to 30, "3 mesi" to 91, "6 mesi" to 182, "Anno" to 365, "Tutto" to null)
-private const val AUTO_PERIOD_CAP = 2 // Settimana
-private val dayFormat = DateTimeFormatter.ofPattern("d MMM yyyy", Locale.ITALIAN)
-private val shortDayFormat = DateTimeFormatter.ofPattern("d MMM", Locale.ITALIAN)
+// Calendar days back from today (inclusive), labelled by Strings.periods; null = all data.
+private val periodDays = listOf(1, 3, 7, 30, 91, 182, 365, null)
+private const val AUTO_PERIOD_CAP = 2 // a week
 private val hourFormat = DateTimeFormatter.ofPattern("HH:mm")
 
 private fun Long.localDate(): LocalDate = Instant.ofEpochMilli(this).atZone(ZoneId.systemDefault()).toLocalDate()
@@ -98,8 +96,8 @@ fun ResultsScreen(runs: List<Run>, target: Long?) {
     val today = LocalDate.now()
     // Default: smallest period covering all data, capped at a week.
     val span = runs.firstOrNull()?.let { ChronoUnit.DAYS.between(it.time.localDate(), today) + 1 } ?: 1
-    val period = picked ?: periods.indexOfFirst { (it.second ?: Int.MAX_VALUE) >= span }.coerceAtMost(AUTO_PERIOD_CAP)
-    val charted = periods[period].second?.let { days -> runs.filter { it.time.localDate() > today.minusDays(days.toLong()) } } ?: runs
+    val period = picked ?: periodDays.indexOfFirst { (it ?: Int.MAX_VALUE) >= span }.coerceAtMost(AUTO_PERIOD_CAP)
+    val charted = periodDays[period]?.let { days -> runs.filter { it.time.localDate() > today.minusDays(days.toLong()) } } ?: runs
 
     val limit = seconds.replace(',', '.').toDoubleOrNull()?.times(1000)
     val shown = runs.asReversed().filter { r ->
@@ -109,39 +107,43 @@ fun ResultsScreen(runs: List<Run>, target: Long?) {
             (outcome == 0 || r.correct == (outcome == 1))
     }
 
+    val dayFormat = DateTimeFormatter.ofPattern("d MMM yyyy", S.locale)
+    val shortDayFormat = DateTimeFormatter.ofPattern("d MMM", S.locale)
+    val strings = S
+
     LazyColumn(contentPadding = PaddingValues(24.dp, 0.dp, 24.dp, 24.dp)) {
         item {
-            Text("Risultati", Modifier.padding(top = 24.dp, bottom = 16.dp), fontFamily = Serif, fontSize = 40.sp)
-            Chips(periods.map { it.first }, period) { picked = it }
+            Text(S.resultsTitle, Modifier.padding(top = TITLE_TOP, bottom = 16.dp), fontFamily = Serif, fontSize = 40.sp)
+            Chips(S.periods, period) { picked = it }
             Row(Modifier.padding(top = 20.dp, bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-                listOf("Tempo", "Errori").forEachIndexed { i, label ->
+                listOf(S.time, S.errors).forEachIndexed { i, label ->
                     Text(label, Modifier.clickable { metric = i }, color = if (i == metric) Ink else Muted, fontFamily = Serif, fontSize = 22.sp)
                 }
             }
             Crossfade(metric, label = "metric") {
-                val days = periods[period].second
+                val days = periodDays[period]
                 // Times of wrong runs don't count; the error chart is about mistakes, so it keeps every run.
                 if (it == 0) {
                     val refs = listOfNotNull(
-                        runs.filter { r -> r.correct }.minOfOrNull { r -> r.millis }?.let { b -> Ref(b.toFloat(), "RECORD", Good) },
-                        target?.let { t -> Ref(t.toFloat(), "OBIETTIVO", Gold) },
+                        runs.filter { r -> r.correct }.minOfOrNull { r -> r.millis }?.let { b -> Ref(b.toFloat(), strings.record.uppercase(strings.locale), Good) },
+                        target?.let { t -> Ref(t.toFloat(), strings.goal.uppercase(strings.locale), Gold) },
                     )
                     Chart(charted.filter { r -> r.correct }, days, { r -> r.millis.toFloat() }, refs) { v -> formatTime(v.toLong()) }
                 }
                 else Chart(charted, days, { r -> r.errors.toFloat() }) { v -> v.toInt().toString() }
             }
             Row(Modifier.padding(top = 28.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                Label("Filtri")
+                Label(S.filters)
                 Spacer(Modifier.weight(1f))
-                Text(if (shown.size == 1) "1 risultato" else "${shown.size} risultati", color = Muted, fontSize = 13.sp)
+                Text(S.results(shown.size), color = Muted, fontSize = 13.sp)
             }
             Row(Modifier.horizontalScroll(rememberScrollState()), Arrangement.spacedBy(8.dp), Alignment.CenterVertically) {
                 Chip(
-                    if (from == null) "Date" else "${from!!.pickerDate().format(shortDayFormat)} – ${(to ?: from)!!.pickerDate().format(shortDayFormat)}",
+                    if (from == null) S.dates else "${from!!.pickerDate().format(shortDayFormat)} – ${(to ?: from)!!.pickerDate().format(shortDayFormat)}",
                     from != null, menu = true,
                 ) { picking = true }
-                MenuChip(listOf("Esito", "Corretti", "Errati")[outcome], outcome != 0, listOf("Tutti", "Corretti", "Errati")) { outcome = it }
-                MenuChip(listOf("Tempo", "Sotto", "Sopra")[timeMode], timeMode != 0, listOf("Ogni tempo", "Sotto", "Sopra")) { timeMode = it }
+                MenuChip(S.outcomeChip[outcome], outcome != 0, S.outcomeMenu) { outcome = it }
+                MenuChip(S.timeChip[timeMode], timeMode != 0, S.timeMenu) { timeMode = it }
                 if (timeMode != 0) SecondsField(seconds) { seconds = it }
             }
             Spacer(Modifier.height(8.dp))
@@ -175,9 +177,9 @@ fun ResultsScreen(runs: List<Run>, target: Long?) {
                     from = state.selectedStartDateMillis
                     to = state.selectedEndDateMillis ?: from
                     picking = false
-                }) { Text("OK") }
+                }) { Text(S.ok) }
             },
-            dismissButton = { TextButton({ from = null; to = null; picking = false }) { Text("Azzera") } },
+            dismissButton = { TextButton({ from = null; to = null; picking = false }) { Text(S.reset) } },
         ) { DateRangePicker(state, Modifier.weight(1f)) }
     }
 }
@@ -233,13 +235,14 @@ private class Ref(val value: Float, val label: String, val color: Color)
 @Composable
 private fun Chart(runs: List<Run>, days: Int?, value: (Run) -> Float, refs: List<Ref> = emptyList(), format: (Float) -> String) {
     if (runs.isEmpty()) {
-        Text("Nessun dato nel periodo", Modifier.padding(vertical = 8.dp), color = Muted, fontSize = 13.sp)
+        Text(S.noData, Modifier.padding(vertical = 8.dp), color = Muted, fontSize = 13.sp)
         return
     }
     val measurer = rememberTextMeasurer()
     val labelStyle = TextStyle(fontFamily = Sans, fontSize = 11.sp, color = Muted)
     val refStyle = TextStyle(fontFamily = Sans, fontWeight = FontWeight.Medium, fontSize = 9.sp, letterSpacing = 1.4.sp)
     val zone = ZoneId.systemDefault()
+    val locale = S.locale
     val values = runs.map(value)
     val top = values.max()
     val shownRefs = refs.filter { it.value <= top } // a ref above every point would only squash the chart
@@ -248,10 +251,10 @@ private fun Chart(runs: List<Run>, days: Int?, value: (Run) -> Float, refs: List
         else days?.let { LocalDate.now().minusDays(it - 1L).atStartOfDay(zone).toInstant().toEpochMilli() } ?: runs.first().time
     val end = if (sticks) runs.last().time else System.currentTimeMillis()
     val ticks = if (sticks) {
-        val f = DateTimeFormatter.ofPattern(if (days == 1) "HH:mm" else "EEE HH:mm", Locale.ITALIAN)
+        val f = DateTimeFormatter.ofPattern(if (days == 1) "HH:mm" else "EEE HH:mm", locale)
         runs.map { it.time to Instant.ofEpochMilli(it.time).atZone(zone).format(f) }
-    } else calendarTicks(start, end).ifEmpty {
-        runs.map { it.time to Instant.ofEpochMilli(it.time).atZone(zone).format(DateTimeFormatter.ofPattern("d MMM HH:mm", Locale.ITALIAN)) }
+    } else calendarTicks(start, end, locale).ifEmpty {
+        runs.map { it.time to Instant.ofEpochMilli(it.time).atZone(zone).format(DateTimeFormatter.ofPattern("d MMM HH:mm", locale)) }
     }
 
     Canvas(Modifier.fillMaxWidth().height(170.dp).padding(top = 8.dp)) {
@@ -314,7 +317,7 @@ private fun Chart(runs: List<Run>, days: Int?, value: (Run) -> Float, refs: List
 }
 
 /** Calendar boundaries between [start] and [end]: hours, days, Mondays or months depending on the span. */
-private fun calendarTicks(start: Long, end: Long): List<Pair<Long, String>> {
+private fun calendarTicks(start: Long, end: Long, locale: Locale): List<Pair<Long, String>> {
     val zone = ZoneId.systemDefault()
     val a = Instant.ofEpochMilli(start).atZone(zone)
     val b = Instant.ofEpochMilli(end).atZone(zone)
@@ -325,7 +328,7 @@ private fun calendarTicks(start: Long, end: Long): List<Pair<Long, String>> {
         spanDays <= 90 -> Triple(a.toLocalDate().with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)).atStartOfDay(zone), Period.ofWeeks(1), "d MMM")
         else -> Triple(a.toLocalDate().withDayOfMonth(1).atStartOfDay(zone), Period.ofMonths(1), if (spanDays > 365) "MMM yy" else "MMM")
     }
-    val f = DateTimeFormatter.ofPattern(pattern, Locale.ITALIAN)
+    val f = DateTimeFormatter.ofPattern(pattern, locale)
     return generateSequence(first) { it.plus(step) }.takeWhile { !it.isAfter(b) }.filter { !it.isBefore(a) }
         .map { it.toInstant().toEpochMilli() to it.format(f) }.toList()
 }

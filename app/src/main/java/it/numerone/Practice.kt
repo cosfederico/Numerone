@@ -97,7 +97,7 @@ private enum class Phase { Idle, Ready, Memorizing, Recall, Done }
 private const val DIGIT_REVEAL_MS = 40
 
 @Composable
-fun PracticeScreen(runs: List<Run>, reached: List<Reached>, onRun: (Run) -> Unit, onGoal: () -> Unit) {
+fun PracticeScreen(runs: List<Run>, reached: List<Reached>, name: String, onRun: (Run) -> Unit, onGoal: () -> Unit) {
     var phase by rememberSaveable { mutableStateOf(Phase.Idle) }
     var number by rememberSaveable { mutableStateOf("") }
     var input by rememberSaveable { mutableStateOf("") }
@@ -132,8 +132,8 @@ fun PracticeScreen(runs: List<Run>, reached: List<Reached>, onRun: (Run) -> Unit
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize().padding(horizontal = 24.dp)) {
             Text(
-                "“VIVI OGNI GIORNO COME SE FOSSE IL PRIMO”", Modifier.fillMaxWidth().padding(top = 20.dp),
-                color = Muted, fontFamily = Sans, fontWeight = FontWeight.Light, fontSize = 11.sp, letterSpacing = 2.sp,
+                "“${S.motto}”", Modifier.fillMaxWidth().padding(top = 12.dp),
+                color = Muted, fontFamily = Sans, fontWeight = FontWeight.Light, fontSize = 10.sp, letterSpacing = 1.4.sp,
                 textAlign = TextAlign.Center,
             )
             AnimatedContent(
@@ -142,8 +142,8 @@ fun PracticeScreen(runs: List<Run>, reached: List<Reached>, onRun: (Run) -> Unit
                 label = "start",
             ) { idle ->
                 if (idle) Column(Modifier.fillMaxSize(), Arrangement.Center, Alignment.CenterHorizontally) {
-                    Text("Numerone", fontFamily = Serif, fontSize = 64.sp)
-                    Text("$LENGTH cifre da memorizzare nel minor tempo possibile.", color = Muted, textAlign = TextAlign.Center)
+                    Text(S.numerone, fontFamily = Serif, fontSize = 64.sp)
+                    Text(S.idleSubtitle(name), color = Muted, textAlign = TextAlign.Center)
                 }
                 else Box(Modifier.fillMaxSize(), Alignment.Center) { Column(Modifier.verticalScroll(rememberScrollState()).padding(vertical = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                     val elapsed = when (phase) {
@@ -162,12 +162,12 @@ fun PracticeScreen(runs: List<Run>, reached: List<Reached>, onRun: (Run) -> Unit
                         label = "recall",
                     ) { recall ->
                         when {
-                            !recall -> Memorize(number, phase == Phase.Ready)
+                            !recall -> Memorize(number, phase == Phase.Ready, name)
                             phase == Phase.Recall -> Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                                Label("Scrivi il numerone")
+                                Label(S.writeNumber)
                                 DigitInput(input) { input = it }
                             }
-                            else -> Check(run, reveal.value, checked, record, prior.lastOrNull(), best)
+                            else -> Check(run, reveal.value, checked, record, prior.lastOrNull(), best, name)
                         }
                     }
                 } }
@@ -176,12 +176,12 @@ fun PracticeScreen(runs: List<Run>, reached: List<Reached>, onRun: (Run) -> Unit
             Box(Modifier.fillMaxWidth().padding(vertical = 20.dp).height(56.dp)) {
                 AnimatedContent(phase to checked, transitionSpec = { fadeIn(tween(300)) togetherWith fadeOut(tween(300)) }, label = "button") { (p, c) ->
                     when (p) {
-                        Phase.Idle -> Pill("Inizia", Ink, onClick = ::next)
-                        Phase.Ready -> Pill("Memorizza", Good) { start = SystemClock.elapsedRealtime(); phase = Phase.Memorizing }
-                        Phase.Memorizing -> Pill("Stop", Ink) { millis = SystemClock.elapsedRealtime() - start; phase = Phase.Recall }
-                        Phase.Recall -> Pill("Invia", Ink, enabled = input.length == LENGTH) { confirm = true }
+                        Phase.Idle -> Pill(S.start, Ink, onClick = ::next)
+                        Phase.Ready -> Pill(S.memorize, Good) { start = SystemClock.elapsedRealtime(); phase = Phase.Memorizing }
+                        Phase.Memorizing -> Pill(S.stop, Ink) { millis = SystemClock.elapsedRealtime() - start; phase = Phase.Recall }
+                        Phase.Recall -> Pill(S.send, Ink, enabled = input.length == LENGTH) { confirm = true }
                         Phase.Done -> if (c) {
-                            if (run.correct) Pill("Vai oltre!", Good, onClick = ::next) else Pill("Riprova!", Ink, onClick = ::next)
+                            if (run.correct) Pill(S.goOn, Good, onClick = ::next) else Pill(S.retry, Ink, onClick = ::next)
                         }
                     }
                 }
@@ -189,7 +189,7 @@ fun PracticeScreen(runs: List<Run>, reached: List<Reached>, onRun: (Run) -> Unit
         }
 
         val goal = reached.firstOrNull { it.time == time }
-        if (checked && goal != null) GoalCelebration(goal.target) {
+        if (checked && goal != null) GoalCelebration(goal.target, name) {
             phase = Phase.Idle
             onGoal()
         } else if (checked && record) Confetti(listOf(Good, Bad, Ink, Gold, Sand))
@@ -197,16 +197,16 @@ fun PracticeScreen(runs: List<Run>, reached: List<Reached>, onRun: (Run) -> Unit
 
     if (confirm) AlertDialog(
         onDismissRequest = { confirm = false },
-        text = { Text("Sei sicuro che è corretto?", fontFamily = Serif, fontSize = 24.sp, color = Ink) },
+        text = { Text(S.sure, fontFamily = Serif, fontSize = 24.sp, color = Ink) },
         confirmButton = {
             TextButton({
                 confirm = false
                 time = System.currentTimeMillis()
                 onRun(Run(time, millis, number, input))
                 phase = Phase.Done
-            }) { Text("Sì") }
+            }) { Text(S.yes) }
         },
-        dismissButton = { TextButton({ confirm = false }) { Text("No") } },
+        dismissButton = { TextButton({ confirm = false }) { Text(S.no) } },
     )
 }
 
@@ -218,10 +218,10 @@ private fun Timer(ms: Long, visible: Boolean, onToggle: (() -> Unit)?) {
         Modifier.clip(CircleShape).then(if (onToggle != null) Modifier.clickable(onClick = onToggle) else Modifier).padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Label("Timer")
+        Label(S.timer)
         if (onToggle != null) Icon(
             if (visible) Icons.Outlined.Visibility else Icons.Outlined.VisibilityOff,
-            if (visible) "Nascondi timer" else "Mostra timer",
+            if (visible) S.hideTimer else S.showTimer,
             Modifier.padding(start = 8.dp).size(16.dp), tint = Muted,
         )
     }
@@ -236,15 +236,14 @@ private fun Timer(ms: Long, visible: Boolean, onToggle: (() -> Unit)?) {
 
 /** Number blurred out until [ready] turns false, then it sharpens into view. */
 @Composable
-private fun Memorize(number: String, ready: Boolean) {
+private fun Memorize(number: String, ready: Boolean, name: String) {
     val blur by animateDpAsState(if (ready) 14.dp else 0.dp, tween(700), label = "blur")
     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(28.dp)) {
         // Placeholder digits while blurred, so nothing leaks before the timer starts (or where blur is unsupported).
         Digits(if (ready) "0".repeat(LENGTH) else number, Modifier.blur(blur, BlurredEdgeTreatment.Unbounded), align = Alignment.Center)
         Crossfade(ready, label = "hint") {
             Text(
-                if (it) "Il numerone è stato generato. Effettua il rilassamento e, quando sei pronto, premi Memorizza per iniziare."
-                else "Memorizza il numerone, poi premi Stop.",
+                if (it) S.readyHint(name) else S.memorizeHint,
                 color = Muted, fontSize = 15.sp, lineHeight = 22.sp, textAlign = TextAlign.Center,
             )
         }
@@ -253,33 +252,35 @@ private fun Memorize(number: String, ready: Boolean) {
 
 /** Original digits appear one by one above the answer, both colored as they are checked; then the verdict. */
 @Composable
-private fun Check(run: Run, reveal: Float, checked: Boolean, record: Boolean, previous: Run?, best: Long?) {
+private fun Check(run: Run, reveal: Float, checked: Boolean, record: Boolean, previous: Run?, best: Long?, name: String) {
     fun progress(i: Int) = (reveal - i).coerceIn(0f, 1f)
     fun verdict(i: Int) = if (run.ok(i)) Good else Bad
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Label("Numerone")
+        Label(S.numerone)
         Digits(run.number, align = Alignment.Center) { verdict(it).copy(alpha = progress(it)) }
         Spacer(Modifier.height(8.dp))
-        Label("La tua risposta")
+        Label(S.yourAnswer)
         Digits(run.input, align = Alignment.Center) { lerp(Ink, verdict(it), progress(it)) }
 
         AnimatedVisibility(checked, enter = fadeIn(tween(600)) + slideInVertically(tween(600)) { it / 6 }) {
             Column(Modifier.fillMaxWidth().padding(top = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(if (run.correct) "Bravo!" else "Peccato!", color = if (run.correct) Good else Bad, fontFamily = Serif, fontSize = 56.sp)
+                Text(
+                    if (run.correct) S.bravo(name) else S.peccato(name), color = if (run.correct) Good else Bad,
+                    fontFamily = Serif, fontSize = 48.sp, lineHeight = 54.sp, textAlign = TextAlign.Center,
+                )
                 Text(
                     when {
-                        record -> "Nuovo record!"
-                        run.correct -> "Tutte le cifre corrette"
-                        run.errors == 1 -> "1 cifra errata"
-                        else -> "${run.errors} cifre errate"
+                        record -> S.newRecord
+                        run.correct -> S.allCorrect
+                        else -> S.wrongDigits(run.errors)
                     },
                     color = Muted,
                 )
                 Spacer(Modifier.height(16.dp))
                 HorizontalDivider(color = Sand)
-                Stat("Ultimo tentativo", previous?.millis, previous?.let { " · ${it.errors} err." }, previous?.let { run.millis - it.millis })
+                Stat(S.lastAttempt, previous?.millis, previous?.let { S.errorsShort(it.errors) }, previous?.let { run.millis - it.millis })
                 HorizontalDivider(color = Sand)
-                Stat("Record", best, null, best?.let { run.millis - it })
+                Stat(S.record, best, null, best?.let { run.millis - it })
                 HorizontalDivider(color = Sand)
             }
         }
@@ -352,7 +353,7 @@ private fun Confetti(colors: List<Color>, count: Int = 120) {
 
 /** The biggest celebration: golden overlay, gold confetti and rising claps. Tap or wait to continue. */
 @Composable
-private fun GoalCelebration(target: Long, onDone: () -> Unit) {
+private fun GoalCelebration(target: Long, name: String, onDone: () -> Unit) {
     val appear = remember { Animatable(0f) }
     LaunchedEffect(Unit) { appear.animateTo(1f, spring(dampingRatio = 0.45f, stiffness = 120f)) }
     LaunchedEffect(Unit) {
@@ -379,11 +380,11 @@ private fun GoalCelebration(target: Long, onDone: () -> Unit) {
         ) {
             Icon(Icons.Filled.EmojiEvents, null, Modifier.size(88.dp).gold(brush))
             Text(
-                "HAI RAGGIUNTO\nIL TUO OBIETTIVO!", style = TextStyle(brush = brush),
+                S.goalReached(name), style = TextStyle(brush = brush),
                 fontFamily = Serif, fontSize = 40.sp, lineHeight = 46.sp, textAlign = TextAlign.Center,
             )
             Text(formatTime(target), style = TextStyle(brush = brush), fontFamily = Serif, fontSize = 34.sp)
-            Text("Fatti un bel punto 7", Modifier.padding(top = 8.dp), color = Ink, fontSize = 20.sp)
+            Text(S.punto7(name), Modifier.padding(top = 8.dp), color = Ink, fontSize = 20.sp)
         }
         Confetti(listOf(Gold, GoldLight, GoldDark, Color(0xFFFFF4C9)), count = 240)
     }

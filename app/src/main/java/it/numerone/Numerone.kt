@@ -18,6 +18,20 @@ data class Goals(val target: Long? = null, val reached: List<Reached> = emptyLis
         if (target != null && run.correct && run.millis < target) Goals(null, reached + Reached(target, run.time, run.millis)) else this
 }
 
+const val MAX_NAME = 20
+
+data class Settings(val name: String = "", val lang: String = "it")
+
+/**
+ * Sanitizes a typed name: only letters, spaces, apostrophes, hyphens and dots survive (no markup, quotes,
+ * control or format characters), runs of spaces collapse, and the length is capped. Trailing space is kept
+ * while typing; [validName] trims for storage.
+ */
+fun cleanName(raw: String) = raw.filter { it.isLetter() || it in " '’-." }.replace(Regex(" {2,}"), " ").trimStart().take(MAX_NAME)
+
+/** The name to store, or null when nothing usable is left. */
+fun validName(raw: String) = cleanName(raw).trim().takeIf { n -> n.any { it.isLetter() } }
+
 /** 20 random digits whose 10 pairs (positions 0-1, 2-3, ...) are all distinct. */
 fun generateNumerone(random: Random = Random.Default): String {
     while (true) {
