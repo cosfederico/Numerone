@@ -191,7 +191,7 @@ fun App(store: Store) {
                             },
                             onGoal = { tab = 0 },
                         )
-                        else -> ResultsScreen(runs)
+                        else -> ResultsScreen(runs, goals.target)
                     }
                 }
             }

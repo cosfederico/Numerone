@@ -47,13 +47,18 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -80,7 +85,7 @@ private fun Long.localDate(): LocalDate = Instant.ofEpochMilli(this).atZone(Zone
 private fun Long.pickerDate(): LocalDate = Instant.ofEpochMilli(this).atZone(ZoneOffset.UTC).toLocalDate() // pickers return UTC midnight
 
 @Composable
-fun ResultsScreen(runs: List<Run>) {
+fun ResultsScreen(runs: List<Run>, target: Long?) {
     var picked by rememberSaveable { mutableStateOf<Int?>(null) } // null until the user picks a period
     var metric by rememberSaveable { mutableIntStateOf(0) } // 0 time, 1 wrong digits
     var from by rememberSaveable { mutableStateOf<Long?>(null) }
@@ -116,7 +121,13 @@ fun ResultsScreen(runs: List<Run>) {
             Crossfade(metric, label = "metric") {
                 val days = periods[period].second
                 // Times of wrong runs don't count; the error chart is about mistakes, so it keeps every run.
-                if (it == 0) Chart(charted.filter { r -> r.correct }, days, { r -> r.millis.toFloat() }) { v -> formatTime(v.toLong()) }
+                if (it == 0) {
+                    val refs = listOfNotNull(
+                        runs.filter { r -> r.correct }.minOfOrNull { r -> r.millis }?.let { b -> Ref(b.toFloat(), "RECORD", Good) },
+                        target?.let { t -> Ref(t.toFloat(), "OBIETTIVO", Gold) },
+                    )
+                    Chart(charted.filter { r -> r.correct }, days, { r -> r.millis.toFloat() }, refs) { v -> formatTime(v.toLong()) }
+                }
                 else Chart(charted, days, { r -> r.errors.toFloat() }) { v -> v.toInt().toString() }
             }
             Row(Modifier.padding(top = 28.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -212,21 +223,26 @@ private fun SecondsField(value: String, onChange: (String) -> Unit) = BasicTextF
     },
 )
 
+/** Horizontal reference line, e.g. the record or the goal. */
+private class Ref(val value: Float, val label: String, val color: Color)
+
 /**
- * Values over time with min/max guides on the y axis. Few runs in a short period: a stick per run, each
+ * Values over time with min/max guides on the y axis and optional dotted [refs] lines. Few runs in a short period: a stick per run, each
  * labelled with its time, x spanning the runs. Otherwise: x spans the whole period with sparse calendar ticks.
  */
 @Composable
-private fun Chart(runs: List<Run>, days: Int?, value: (Run) -> Float, format: (Float) -> String) {
+private fun Chart(runs: List<Run>, days: Int?, value: (Run) -> Float, refs: List<Ref> = emptyList(), format: (Float) -> String) {
     if (runs.isEmpty()) {
         Text("Nessun dato nel periodo", Modifier.padding(vertical = 8.dp), color = Muted, fontSize = 13.sp)
         return
     }
     val measurer = rememberTextMeasurer()
     val labelStyle = TextStyle(fontFamily = Sans, fontSize = 11.sp, color = Muted)
+    val refStyle = TextStyle(fontFamily = Sans, fontWeight = FontWeight.Medium, fontSize = 9.sp, letterSpacing = 1.4.sp)
     val zone = ZoneId.systemDefault()
     val values = runs.map(value)
     val top = values.max()
+    val shownRefs = refs.filter { it.value <= top } // a ref above every point would only squash the chart
     val sticks = days != null && days <= 3 && runs.size <= 12
     val start = if (sticks) runs.first().time
         else days?.let { LocalDate.now().minusDays(it - 1L).atStartOfDay(zone).toInstant().toEpochMilli() } ?: runs.first().time
@@ -259,10 +275,29 @@ private fun Chart(runs: List<Run>, days: Int?, value: (Run) -> Float, format: (F
             drawText(label, topLeft = Offset(0f, yy - label.size.height / 2))
         }
 
+        shownRefs.forEach { ref ->
+            val yy = y(ref.value)
+            drawLine(
+                ref.color, Offset(gutter, yy), Offset(size.width, yy), 1.5.dp.toPx(), StrokeCap.Round,
+                PathEffect.dashPathEffect(floatArrayOf(0.01f, 4.dp.toPx())), // round caps on zero-length dashes = dots
+            )
+        }
+
         val points = runs.map { Offset(x(it.time), y(value(it))) }
         if (sticks) points.forEach { drawLine(Muted.copy(alpha = 0.35f), Offset(it.x, bottom), it, hair) }
         drawPath(Path().apply { points.forEachIndexed { i, p -> if (i == 0) moveTo(p.x, p.y) else lineTo(p.x, p.y) } }, Ink, style = Stroke(1.5.dp.toPx()))
         runs.forEachIndexed { i, run -> drawCircle(if (run.correct) Good else Bad, r, points[i]) }
+        // Ref tags last: small tinted pills on their line at the left edge, so they cover old points, not new ones.
+        shownRefs.forEach { ref ->
+            val label = measurer.measure(ref.label, refStyle.copy(color = ref.color))
+            val pad = Offset(7.dp.toPx(), 3.dp.toPx())
+            val tag = Size(label.size.width + 2 * pad.x, label.size.height + 2 * pad.y)
+            val at = Offset(gutter, y(ref.value) - tag.height / 2)
+            val corner = CornerRadius(tag.height / 2)
+            drawRoundRect(Beige, at, tag, corner)
+            drawRoundRect(ref.color.copy(alpha = 0.14f), at, tag, corner)
+            drawText(label, topLeft = at + pad)
+        }
 
         // X labels: centered under sticks, left-aligned on calendar ticks; skipped when they would overlap.
         var lastRight = Float.NEGATIVE_INFINITY
