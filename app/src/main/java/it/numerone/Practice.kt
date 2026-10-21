@@ -226,7 +226,7 @@ private fun Timer(ms: Long, visible: Boolean, onToggle: (() -> Unit)?) {
         )
     }
     // Fixed-width cells so the proportional serif digits don't jitter while running.
-    val cell = with(LocalDensity.current) { 64.sp.toDp() * 0.6f }
+    val cell = with(LocalDensity.current) { 64.sp.toDp() * 0.62f }
     Row(Modifier.alpha(shown).blur(16.dp * (1 - shown), BlurredEdgeTreatment.Unbounded)) {
         formatTime(ms).forEach {
             Text(it.toString(), Modifier.width(if (it.isDigit()) cell else cell * 0.45f), fontFamily = Serif, fontSize = 64.sp, textAlign = TextAlign.Center, maxLines = 1)

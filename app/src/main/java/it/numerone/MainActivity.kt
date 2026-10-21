@@ -80,11 +80,12 @@ val Gold = Color(0xFFC9A646)
 val GoldLight = Color(0xFFF1DE8F)
 val GoldDark = Color(0xFF9A7621)
 
-val Serif = FontFamily(Font(R.font.dm_serif_display))
+// Medium (500): Libre Caslon Text reads too thin at 400 and too heavy at bold for the big timers.
+val Serif = FontFamily(Font(R.font.libre_caslon_text, variationSettings = FontVariation.Settings(FontVariation.weight(500))))
 val Sans = FontFamily(
-    Font(R.font.inter, FontWeight.Light, variationSettings = FontVariation.Settings(FontVariation.weight(300))),
-    Font(R.font.inter, FontWeight.Medium, variationSettings = FontVariation.Settings(FontVariation.weight(500))),
-    Font(R.font.inter, FontWeight.Bold, variationSettings = FontVariation.Settings(FontVariation.weight(700))),
+    listOf(FontWeight.Light, FontWeight.Normal, FontWeight.Medium, FontWeight.Bold).map {
+        Font(R.font.inter, it, variationSettings = FontVariation.Settings(FontVariation.weight(it.weight)))
+    },
 )
 
 // ponytail: rewrites whole files on each change, fine for thousands of runs; move to Room if it ever lags.
