@@ -155,17 +155,19 @@ fun GoalScreen(runs: List<Run>, goals: Goals, onTarget: (Long?) -> Unit) {
         }
     }
 
-    if (editing) TargetDialog(goals.target, onDismiss = { editing = false }) {
+    if (editing) TargetDialog(goals.target, best?.millis, onDismiss = { editing = false }) {
         onTarget(it)
         editing = false
     }
 }
 
+/** A goal slower than the [record] would already be beaten, so it can't be saved. */
 @Composable
-private fun TargetDialog(current: Long?, onDismiss: () -> Unit, onSave: (Long) -> Unit) {
+private fun TargetDialog(current: Long?, record: Long?, onDismiss: () -> Unit, onSave: (Long) -> Unit) {
     var text by rememberSaveable { mutableStateOf(current?.let { "%.2f".format(Locale.ROOT, it / 1000.0) } ?: "") }
     val motto = rememberSaveable { mottos.random() }
     val millis = text.replace(',', '.').toDoubleOrNull()?.times(1000)?.toLong()?.takeIf { it > 0 }
+    val beaten = millis != null && record != null && millis > record
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Obiettivo", fontFamily = Serif, fontSize = 28.sp, color = Ink) },
@@ -175,12 +177,16 @@ private fun TargetDialog(current: Long?, onDismiss: () -> Unit, onSave: (Long) -
                 OutlinedTextField(
                     text, { text = it.filter { c -> c.isDigit() || c == '.' || c == ',' } },
                     singleLine = true, suffix = { Text("s") },
-                    supportingText = { millis?.let { Text(formatTime(it)) } },
+                    isError = beaten,
+                    supportingText = {
+                        if (beaten) Text("Il tuo record ${formatTime(record!!)} è già sotto: punta più in alto!")
+                        else millis?.let { Text(formatTime(it)) }
+                    },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 )
             }
         },
-        confirmButton = { TextButton({ millis?.let(onSave) }, enabled = millis != null) { Text("Salva") } },
+        confirmButton = { TextButton({ millis?.let(onSave) }, enabled = millis != null && !beaten) { Text("Salva") } },
         dismissButton = { TextButton(onDismiss) { Text("Annulla") } },
     )
 }
