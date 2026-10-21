@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Numerone" parent="@android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/beige</item>
+        <item name="android:windowSplashScreenBackground">@color/beige</item>
+        <item name="android:windowSplashScreenIconBackgroundColor">@color/beige</item>
+    </style>
+    <color name="beige">#EDE6D9</color>
+</resources>
