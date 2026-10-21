@@ -37,6 +37,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.selection.LocalTextSelectionColors
+import androidx.compose.foundation.text.selection.TextSelectionColors
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.EmojiEvents
@@ -128,6 +131,11 @@ fun PracticeScreen(runs: List<Run>, reached: List<Reached>, onRun: (Run) -> Unit
 
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize().padding(horizontal = 24.dp)) {
+            Text(
+                "“VIVI OGNI GIORNO COME SE FOSSE IL PRIMO”", Modifier.fillMaxWidth().padding(top = 20.dp),
+                color = Muted, fontFamily = Sans, fontWeight = FontWeight.Light, fontSize = 11.sp, letterSpacing = 2.sp,
+                textAlign = TextAlign.Center,
+            )
             AnimatedContent(
                 phase == Phase.Idle, Modifier.weight(1f),
                 transitionSpec = { (fadeIn(tween(500, 150)) + slideInVertically(tween(500, 150)) { it / 12 }) togetherWith fadeOut(tween(200)) },
@@ -137,7 +145,7 @@ fun PracticeScreen(runs: List<Run>, reached: List<Reached>, onRun: (Run) -> Unit
                     Text("Numerone", fontFamily = Serif, fontSize = 64.sp)
                     Text("$LENGTH cifre da memorizzare nel minor tempo possibile.", color = Muted, textAlign = TextAlign.Center)
                 }
-                else Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(top = 40.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                else Box(Modifier.fillMaxSize(), Alignment.Center) { Column(Modifier.verticalScroll(rememberScrollState()).padding(vertical = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                     val elapsed = when (phase) {
                         Phase.Ready -> 0L
                         Phase.Memorizing -> (now - start).coerceAtLeast(0)
@@ -162,7 +170,7 @@ fun PracticeScreen(runs: List<Run>, reached: List<Reached>, onRun: (Run) -> Unit
                             else -> Check(run, reveal.value, checked, record, prior.lastOrNull(), best)
                         }
                     }
-                }
+                } }
             }
 
             Box(Modifier.fillMaxWidth().padding(vertical = 20.dp).height(56.dp)) {
@@ -310,12 +318,15 @@ private fun DigitInput(value: String, onChange: (String) -> Unit) {
     val focus = remember { FocusRequester() }
     Box {
         Digits(value.padEnd(LENGTH, '0'), align = Alignment.Center) { if (it < value.length) Ink else Sand }
-        BasicTextField(
-            value, { onChange(it.filter(Char::isDigit).take(LENGTH)) },
-            Modifier.matchParentSize().alpha(0f).focusRequester(focus),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
-            singleLine = true,
-        )
+        // Transparent selection colors hide the cursor handle, which is drawn in a popup and ignores alpha.
+        CompositionLocalProvider(LocalTextSelectionColors provides TextSelectionColors(Color.Transparent, Color.Transparent)) {
+            BasicTextField(
+                value, { onChange(it.filter(Char::isDigit).take(LENGTH)) },
+                Modifier.matchParentSize().alpha(0f).focusRequester(focus),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                singleLine = true,
+            )
+        }
     }
     val keyboard = LocalSoftwareKeyboardController.current
     LaunchedEffect(Unit) { focus.requestFocus(); keyboard?.show() }

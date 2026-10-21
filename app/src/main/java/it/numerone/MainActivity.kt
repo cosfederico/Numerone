@@ -82,6 +82,7 @@ val GoldDark = Color(0xFF9A7621)
 
 val Serif = FontFamily(Font(R.font.dm_serif_display))
 val Sans = FontFamily(
+    Font(R.font.inter, FontWeight.Light, variationSettings = FontVariation.Settings(FontVariation.weight(300))),
     Font(R.font.inter, FontWeight.Medium, variationSettings = FontVariation.Settings(FontVariation.weight(500))),
     Font(R.font.inter, FontWeight.Bold, variationSettings = FontVariation.Settings(FontVariation.weight(700))),
 )
