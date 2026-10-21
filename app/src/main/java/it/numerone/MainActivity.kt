@@ -7,7 +7,6 @@ import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -92,8 +91,8 @@ val Muted = Color(0xFF8C8377)
 val Good = Color(0xFF4C8A5A)
 val Bad = Color(0xFFC0503F)
 
-/** Space above the big page titles; the settings gear lines up with it. */
-val TITLE_TOP = 12.dp
+/** Space above the big page titles; the settings gear and the practice motto line up with them. */
+val TITLE_TOP = 28.dp
 
 val Gold = Color(0xFFC9A646)
 val GoldLight = Color(0xFFF1DE8F)
@@ -233,9 +232,8 @@ fun App(store: Store) {
                             }
                         }
                     }
-                    // Floats on the page's first line: the motto on Pratica, the big title elsewhere.
-                    val gearTop by animateDpAsState(if (tab == 1) 0.dp else TITLE_TOP + 4.dp, label = "gear")
-                    IconButton({ settingsOpen = true }, Modifier.align(Alignment.TopEnd).padding(top = gearTop, end = 8.dp)) {
+                    // Fixed on the line of the page titles (and of the motto on Pratica).
+                    IconButton({ settingsOpen = true }, Modifier.align(Alignment.TopEnd).padding(top = TITLE_TOP + 4.dp, end = 8.dp)) {
                         Icon(Icons.Outlined.Settings, S.settings, tint = Muted)
                     }
                     }

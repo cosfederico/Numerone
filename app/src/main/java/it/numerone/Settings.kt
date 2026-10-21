@@ -151,7 +151,7 @@ fun LanguageChips(lang: String, onSelect: (String) -> Unit) =
 
 @Composable
 private fun BackTitle(title: String, onBack: () -> Unit) =
-    Row(Modifier.padding(top = 8.dp, bottom = 24.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(Modifier.padding(top = TITLE_TOP - 4.dp, bottom = 24.dp), verticalAlignment = Alignment.CenterVertically) {
         IconButton(onBack, Modifier.padding(end = 4.dp)) { Icon(Icons.AutoMirrored.Filled.ArrowBack, S.back) }
         Text(title, fontFamily = Serif, fontSize = 36.sp)
     }

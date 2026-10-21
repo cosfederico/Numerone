@@ -132,7 +132,7 @@ fun PracticeScreen(runs: List<Run>, reached: List<Reached>, name: String, onRun:
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize().padding(horizontal = 24.dp)) {
             Text(
-                "“${S.motto}”", Modifier.fillMaxWidth().padding(top = 12.dp),
+                "“${S.motto}”", Modifier.fillMaxWidth().padding(top = TITLE_TOP + 20.dp),
                 color = Muted, fontFamily = Sans, fontWeight = FontWeight.Light, fontSize = 10.sp, letterSpacing = 1.4.sp,
                 textAlign = TextAlign.Center,
             )
