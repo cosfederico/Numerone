@@ -42,6 +42,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -68,6 +73,43 @@ fun GoalScreen(runs: List<Run>, goals: Goals, onTarget: (Long?) -> Unit) {
         item {
             Text("Obiettivo", Modifier.padding(top = 24.dp, bottom = 24.dp), fontFamily = Serif, fontSize = 40.sp)
 
+            // Dashed gold frame and hollow numbers: an empty slot still to be filled. Solid gold is for reached goals.
+            val stroke = with(LocalDensity.current) { 1.5.dp.toPx() }
+            Column(
+                Modifier.fillMaxWidth()
+                    .drawBehind {
+                        drawRoundRect(
+                            Gold, cornerRadius = CornerRadius(24.dp.toPx()),
+                            style = Stroke(stroke, pathEffect = PathEffect.dashPathEffect(floatArrayOf(8.dp.toPx(), 6.dp.toPx()))),
+                        )
+                    }
+                    .padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("🎯", Modifier.padding(end = 6.dp), fontSize = 13.sp)
+                    Text("OBIETTIVO", color = Gold, fontSize = 12.sp, letterSpacing = 1.5.sp)
+                }
+                val target = goals.target
+                if (target == null) {
+                    Text("Nessun obiettivo impostato.", Modifier.padding(top = 8.dp, bottom = 24.dp), color = Muted)
+                    Glowing { Pill("Imposta obiettivo", Gold) { editing = true } }
+                } else {
+                    Text(formatTime(target), color = Gold, fontFamily = Serif, fontSize = 64.sp, style = TextStyle(drawStyle = Stroke(stroke)))
+                    if (best != null) Text(
+                        if (best.millis >= target) "Ti mancano ${formatDelta(best.millis - target).drop(1)} dal record."
+                        else "Il tuo record è già sotto: rifai un tempo sotto l'obiettivo per raggiungerlo.",
+                        color = Muted, fontSize = 14.sp, textAlign = TextAlign.Center,
+                    )
+                    Row(Modifier.padding(top = 8.dp)) {
+                        TextButton({ editing = true }) { Text("Modifica", color = Ink) }
+                        TextButton({ onTarget(null) }) { Text("Rimuovi", color = Muted) }
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(24.dp))
+
             val card = RoundedCornerShape(24.dp)
             Column(
                 Modifier.fillMaxWidth().background(Paper, card).border(1.dp, Sand, card).padding(vertical = 24.dp),
@@ -78,28 +120,14 @@ fun GoalScreen(runs: List<Run>, goals: Goals, onTarget: (Long?) -> Unit) {
                     Label("Record")
                 }
                 Text(best?.let { formatTime(it.millis) } ?: "—", fontFamily = Serif, fontSize = 64.sp)
-                Text(best?.time?.formatDate() ?: "Nessun tentativo corretto", color = Muted, fontSize = 14.sp)
-            }
-            Spacer(Modifier.height(32.dp))
-
-            Text("OBIETTIVO", color = Gold, fontSize = 12.sp, letterSpacing = 1.5.sp)
-            val target = goals.target
-            if (target == null) {
-                Text("Nessun obiettivo impostato.", Modifier.padding(top = 8.dp, bottom = 20.dp), color = Muted)
-                Glowing { Pill("Imposta obiettivo", Gold) { editing = true } }
-            } else {
-                Text(formatTime(target), style = TextStyle(brush = goldBrush()), fontFamily = Serif, fontSize = 56.sp)
-                Text(
-                    when {
-                        best == null -> "Fai un tempo sotto l'obiettivo con tutte le cifre corrette."
-                        best.millis >= target -> "Ti mancano ${formatDelta(best.millis - target).drop(1)} dal record."
-                        else -> "Il tuo record è già sotto: rifai un tempo sotto l'obiettivo per raggiungerlo."
-                    },
-                    color = Muted, fontSize = 14.sp,
-                )
-                Row(Modifier.padding(top = 8.dp)) {
-                    TextButton({ editing = true }) { Text("Modifica", color = Ink) }
-                    TextButton({ onTarget(null) }) { Text("Rimuovi", color = Muted) }
+                if (best == null) {
+                    Text(
+                        "Il passo più importante di tutti ti aspetta, il prossimo", Modifier.padding(horizontal = 24.dp),
+                        color = Muted, fontSize = 14.sp, textAlign = TextAlign.Center,
+                    )
+                } else {
+                    Text(best.time.formatDate(), color = Muted, fontSize = 14.sp)
+                    Text("Pensi di riuscire a batterlo?", Modifier.padding(top = 12.dp), color = Ink, fontSize = 15.sp)
                 }
             }
 

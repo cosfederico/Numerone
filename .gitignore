@@ -4,3 +4,6 @@ app/build/
 local.properties
 .idea/
 .archeus/
+CLAUDE.md
+AGENTS.md
+.claude/
