@@ -115,7 +115,8 @@ fun ResultsScreen(runs: List<Run>) {
             }
             Crossfade(metric, label = "metric") {
                 val days = periods[period].second
-                if (it == 0) Chart(charted, days, { r -> r.millis.toFloat() }) { v -> formatTime(v.toLong()) }
+                // Times of wrong runs don't count; the error chart is about mistakes, so it keeps every run.
+                if (it == 0) Chart(charted.filter { r -> r.correct }, days, { r -> r.millis.toFloat() }) { v -> formatTime(v.toLong()) }
                 else Chart(charted, days, { r -> r.errors.toFloat() }) { v -> v.toInt().toString() }
             }
             Row(Modifier.padding(top = 28.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
