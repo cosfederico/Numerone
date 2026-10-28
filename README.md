@@ -21,8 +21,8 @@
 
 <p align="center">
   <a href="#features">Features</a> ·
-  <a href="#whats-inside">What's inside</a> ·
   <a href="#get-started">Get started</a> ·
+  <a href="#license">License</a> ·
   <a href="#credits">Credits</a>
 </p>
 
@@ -160,9 +160,11 @@ The launcher icon comes from `tools/make_icon.py`, which draws the hourglass fro
 
 <br>
 
-## License & Credits
+## License
 
 *Numerone* is licensed under MIT. Copyright (c) 2026 Federico Coscia
+
+## Credits
 
 The app draws on the memorization course and techniques of [Vincenzo Palmisano](https://vincenzopalmisano.net) and 6inTempo S.p.A. For the method itself and everything beyond this small practice tool, visit [vincenzopalmisano.net](https://vincenzopalmisano.net).
 
